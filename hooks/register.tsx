@@ -154,8 +154,9 @@ const moons =
   rect(296, 138, 2, 2, '#d6ccb8') +
   rect(190, 22, 2, 2, '#f6efe2')
 
-// Надпись пиксельным шрифтом 5×7 под планетой.
-const CAPTION = 'SOF OF SATURN'
+// Надписи пиксельным шрифтом 5×7: над планетой и под человечком.
+const PLANET_CAPTION = 'SATURN'
+const KID_CAPTION = 'HIS SON'
 
 const FONT: Record<string, readonly string[]> = {
   S: ['.####', '#....', '#....', '.###.', '....#', '....#', '####.'],
@@ -165,6 +166,8 @@ const FONT: Record<string, readonly string[]> = {
   T: ['#####', '..#..', '..#..', '..#..', '..#..', '..#..', '..#..'],
   U: ['#...#', '#...#', '#...#', '#...#', '#...#', '#...#', '.###.'],
   R: ['####.', '#...#', '#...#', '####.', '#.#..', '#..#.', '#...#'],
+  H: ['#...#', '#...#', '#...#', '#####', '#...#', '#...#', '#...#'],
+  I: ['#####', '..#..', '..#..', '..#..', '..#..', '..#..', '#####'],
   N: ['#...#', '##..#', '#.#.#', '#..##', '#...#', '#...#', '#...#'],
 }
 
@@ -191,7 +194,54 @@ const write = (text: string, centerX: number, top: number, color: string): strin
   return out
 }
 
-const caption = write(CAPTION, CX + 1, 133, '#5c4420') + write(CAPTION, CX, 132, '#e0b060')
+const planetCaption = write(PLANET_CAPTION, CX + 1, 31, '#5c4420') + write(PLANET_CAPTION, CX, 30, '#e0b060')
+
+// Сын Сатурна: человечек с головой-планетой и своим кольцом, с подписью под ним.
+const KX = 170
+const KY = 122
+
+const HEAD: readonly (readonly [number, number, string])[] = [
+  [2, 4, '#cca870'],
+  [1, 6, '#e0c088'],
+  [0, 8, '#ecd8a8'],
+  [0, 8, '#e4c890'],
+  [0, 8, '#d8b880'],
+  [0, 8, '#c8a468'],
+  [1, 6, '#c09858'],
+  [2, 4, '#b08850'],
+]
+
+const kidHead = HEAD.map(([x, w, color], y) => rect(KX + x, KY + y, w, 1, color)).join('')
+const kidEyes = rect(KX + 2, KY + 2, 1, 2, '#1a120a') + rect(KX + 5, KY + 2, 1, 2, '#1a120a')
+
+// Кольцо вокруг головы: дальняя дуга за ней, ближняя — поверх.
+const kidRingBack = rect(KX - 3, KY + 3, 3, 1, '#a89070') + rect(KX + 8, KY + 3, 3, 1, '#a89070')
+const kidRingFront =
+  rect(KX - 5, KY + 4, 2, 1, '#e0c898') + rect(KX + 11, KY + 4, 2, 1, '#e0c898') + rect(KX - 4, KY + 5, 16, 1, '#e0c898')
+
+const kidBody =
+  rect(KX + 2, KY + 8, 4, 5, '#3cbcfc') + // туловище
+  rect(KX + 2, KY + 11, 4, 1, '#2c8ccc') + // пояс
+  rect(KX + 1, KY + 9, 1, 1, '#3cbcfc') + // руки в стороны
+  rect(KX + 6, KY + 9, 1, 1, '#3cbcfc') +
+  rect(KX, KY + 8, 1, 1, '#ecd8a8') +
+  rect(KX + 7, KY + 8, 1, 1, '#ecd8a8') +
+  rect(KX + 2, KY + 13, 1, 2, '#2c8ccc') + // ноги
+  rect(KX + 5, KY + 13, 1, 2, '#2c8ccc') +
+  rect(KX + 1, KY + 15, 2, 1, '#e0b060') + // ботинки
+  rect(KX + 5, KY + 15, 2, 1, '#e0b060')
+
+const kid =
+  '<g class="kid">' +
+  kidBody +
+  `<g transform="rotate(-16 ${KX + 4} ${KY + 4.5})">` +
+  kidRingBack +
+  kidHead +
+  kidEyes +
+  kidRingFront +
+  '</g></g>'
+
+const kidCaption = write(KID_CAPTION, KX + 5, KY + 20, '#5c4420') + write(KID_CAPTION, KX + 4, KY + 19, '#e0b060')
 
 const SCENE =
   `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${W} ${H}" preserveAspectRatio="xMidYMid slice" shape-rendering="crispEdges">` +
@@ -202,13 +252,16 @@ const SCENE =
   '.t2{animation:tw 5.9s steps(2) 2s infinite}' +
   '@keyframes bob{0%,100%{transform:translateY(0)}50%{transform:translateY(2px)}}' +
   '.sat{animation:bob 16s steps(4) infinite}' +
-  '@media (prefers-reduced-motion:reduce){.t0,.t1,.t2,.sat{animation:none}}' +
+  '.kid{animation:bob 5s steps(2) infinite}' +
+  '@media (prefers-reduced-motion:reduce){.t0,.t1,.t2,.sat,.kid{animation:none}}' +
   '</style>' +
   space +
   stars +
   moons +
   `<g class="sat">${saturn}</g>` +
-  caption +
+  planetCaption +
+  kid +
+  kidCaption +
   '</svg>'
 
 const LOOK: ThemeSetArgs = {
@@ -243,6 +296,6 @@ export const register: Register = on => {
 
     const { Svg } = $.ui.resolve(e)
 
-    return <Svg source={SCENE} alt="Пиксельный Сатурн с кольцами среди звёзд" isInteractive />
+    return <Svg source={SCENE} alt="Пиксельный Сатурн с кольцами среди звёзд и маленький человечек с таким же кольцом" isInteractive />
   })
 }
