@@ -1,0 +1,5 @@
+{
+  "name": "claude-dendy-theme",
+  "owner": { "name": "maraphet" },
+  "plugins": [{ "name": "dendy-8bit", "source": "./" }]
+}
