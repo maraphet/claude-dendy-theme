@@ -2,16 +2,16 @@ import type { Register, ThemeSetArgs } from 'claude-code'
 
 import { makeColors } from './make-colors.js'
 
-// Вечер у телевизора с 8-битной приставкой: тёмный индиго экрана,
-// чистые цвета палитры той эпохи и пиксельный закат за текстом.
+// Сатурн в синей ночи: глубокий индиго космоса, небесно-синий акцент,
+// песочные полосы планеты и бледное золото колец.
 const { theme, problems } = makeColors({
-  label: 'Dendy 8-bit',
+  label: 'Saturn',
   only: 'dark',
   roles: {
     accent: '#3cbcfc', // небесно-синий
     danger: '#f83800', // красный
     success: '#58d854', // зелёный
-    warning: '#fca044', // янтарный
+    warning: '#fca044', // янтарь
     pro: '#d878f8', // розово-фиолетовый
   },
   dark: {
@@ -29,7 +29,7 @@ const { theme, problems } = makeColors({
   },
 })
 
-// ---- Пиксельная сцена: 320×180, как кадр старой приставки -----------------
+// ---- Пиксельная сцена: 320×180 ---------------------------------------------
 
 const W = 320
 const H = 180
@@ -37,117 +37,186 @@ const H = 180
 const rect = (x: number, y: number, w: number, h: number, fill: string, extra = ''): string =>
   `<rect x="${x}" y="${y}" width="${w}" height="${h}" fill="${fill}"${extra}/>`
 
-// Небо ступенчатыми полосами: от ночного индиго к закатной малине у горизонта.
-const BANDS: readonly (readonly [number, string])[] = [
-  [0, '#0a0a20'],
-  [64, '#0e0e30'],
-  [90, '#161244'],
-  [110, '#24145e'],
-  [126, '#3c1878'],
-  [138, '#641e8c'],
-  [148, '#982c90'],
-  [156, '#d04878'],
-  [162, '#f87858'],
-]
+const snap = (n: number): number => Math.round(n / 2) * 2
 
-const sky = BANDS.map(([y, color], i) => {
-  const end = i + 1 < BANDS.length ? BANDS[i + 1]![0] : H
-
-  return rect(0, y, W, end - y, color)
-}).join('')
+// Космос: ночной индиго, чуть светлее книзу.
+const space =
+  rect(0, 0, W, 80, '#0a0a20') + rect(0, 80, W, 50, '#0c0b25') + rect(0, 130, W, 50, '#100d2c')
 
 // Звёзды: один и тот же узор при каждой загрузке.
-let seed = 1987
+let seed = 1610
 const rand = (): number => {
   seed = (seed * 1103515245 + 12345) % 2147483648
 
   return seed / 2147483648
 }
 
-const STAR_COLORS = ['#f4f0fc', '#3cbcfc', '#fca044', '#d878f8']
+const STAR_COLORS = ['#f4f0fc', '#f4f0fc', '#3cbcfc', '#e0b060', '#d878f8']
 let stars = ''
 
-for (let i = 0; i < 80; i++) {
+for (let i = 0; i < 110; i++) {
   const x = Math.floor(rand() * W)
-  const y = Math.floor(rand() * 118)
-  const size = rand() < 0.25 ? 2 : 1
-  const color = STAR_COLORS[Math.floor(rand() * rand() * STAR_COLORS.length)]!
+  const y = Math.floor(rand() * H)
+  const size = rand() < 0.2 ? 2 : 1
+  const color = STAR_COLORS[Math.floor(rand() * STAR_COLORS.length)]!
 
   stars += rect(x, y, size, size, color, ` class="t${i % 3}"`)
 }
 
-// Луна из ступенек.
-let moon = ''
+// Сатурн: справа, в стороне от текста.
+const CX = 240
+const CY = 80
+const R = 34
 
-for (let row = -6; row < 6; row++) {
-  const half = Math.round(Math.sqrt(6.5 * 6.5 - (row + 0.5) * (row + 0.5)))
+// Полосы облаков от полюса к полюсу.
+const STRIPES = [
+  '#b89058',
+  '#cca870',
+  '#e0c088',
+  '#d4b078',
+  '#ecd8a8',
+  '#e4c890',
+  '#d8b880',
+  '#c8a468',
+  '#dcbc84',
+  '#c09858',
+  '#b08850',
+  '#a07840',
+]
 
-  moon += rect(262 - half * 2, 34 + row * 2, half * 4, 2, '#fce4a0')
+let planet = ''
+
+for (let y = CY - R; y < CY + R; y += 2) {
+  const dy = y + 1 - CY
+  const half = snap(Math.sqrt(R * R - dy * dy))
+
+  if (half < 2) {
+    continue
+  }
+  const stripe = STRIPES[Math.min(STRIPES.length - 1, Math.floor(((y - (CY - R)) / (2 * R)) * STRIPES.length))]!
+
+  planet += rect(CX - half, y, half * 2, 2, stripe)
+  // Ночная сторона: тень слева.
+  planet += rect(CX - half, y, snap(half * 0.5), 2, '#1a120a', ' opacity=".5"')
+  planet += rect(CX - half + snap(half * 0.5), y, snap(half * 0.3), 2, '#1a120a', ' opacity=".22"')
 }
-moon += rect(256, 28, 4, 2, '#e8c070') + rect(266, 38, 4, 4, '#e8c070') + rect(254, 40, 2, 2, '#e8c070')
 
-// Горы: столбики шириной 8, высота ступеньками по 4.
-const ridge = (base: number, amp: number, f1: number, f2: number, color: string): string => {
+// Одно кольцо между двумя эллипсами; back — дальняя половина, front — ближняя.
+const ring = (rxO: number, rxI: number, color: string, side: 'back' | 'front'): string => {
+  const flat = 0.23
+  const ryO = rxO * flat
+  const ryI = rxI * flat
   let out = ''
 
-  for (let i = 0; i < W / 8; i++) {
-    const raw = base + amp * (Math.sin(i * f1) + Math.sin(i * f2 + 1.3))
-    const height = Math.max(4, Math.round(raw / 4) * 4)
+  for (let y = snap(CY - ryO); y < CY + ryO; y += 2) {
+    const dy = y + 1 - CY
 
-    out += rect(i * 8, 168 - height, 8, height, color)
+    if ((side === 'back') !== dy < 0) {
+      continue
+    }
+    const xo = snap(rxO * Math.sqrt(Math.max(0, 1 - (dy / ryO) ** 2)))
+    const xi = Math.abs(dy) < ryI ? snap(rxI * Math.sqrt(1 - (dy / ryI) ** 2)) : 0
+
+    if (xo <= xi) {
+      continue
+    }
+    if (xi === 0) {
+      out += rect(CX - xo, y, xo * 2, 2, color)
+    } else {
+      out += rect(CX - xo, y, xo - xi, 2, color) + rect(CX + xi, y, xo - xi, 2, color)
+    }
   }
 
   return out
 }
 
-const mountains = ridge(34, 11, 0.55, 0.21, '#2c1468') + ridge(16, 7, 0.9, 0.37, '#150b3a')
+const rings = (side: 'back' | 'front'): string =>
+  ring(78, 70, '#8c7858', side) + // внешнее кольцо
+  ring(67, 54, '#e0c898', side) + // яркое среднее, за щелью
+  ring(52, 44, '#a89070', side) // тусклое внутреннее
 
-// Земля: тёмная полоса с травяной кромкой.
-let ground = rect(0, 168, W, 12, '#0c0a22') + rect(0, 168, W, 2, '#58d854')
+// Тень планеты на дальней половине колец.
+const ringShadow = rect(CX - R - 30, CY - 20, 30, 20, '#0a0a20', ' opacity=".55"')
 
-for (let x = 0; x < W; x += 16) {
-  ground += rect(x + 4, 170, 4, 2, '#2c9c3c') + rect(x + 12, 174, 4, 2, '#1c1648')
+const saturn =
+  `<g transform="rotate(-16 ${CX} ${CY})">` +
+  rings('back') +
+  ringShadow +
+  planet +
+  rings('front') +
+  '</g>'
+
+// Спутники: Титан покрупнее и оранжевый, остальные — светлые точки.
+const moons =
+  rect(118, 44, 4, 4, '#e8a048') +
+  rect(118, 44, 2, 4, '#a86820') +
+  rect(152, 122, 2, 2, '#d6ccb8') +
+  rect(296, 138, 2, 2, '#d6ccb8') +
+  rect(190, 22, 2, 2, '#f6efe2')
+
+// Надпись пиксельным шрифтом 5×7 под планетой.
+const CAPTION = 'SOF OF SATURN'
+
+const FONT: Record<string, readonly string[]> = {
+  S: ['.####', '#....', '#....', '.###.', '....#', '....#', '####.'],
+  O: ['.###.', '#...#', '#...#', '#...#', '#...#', '#...#', '.###.'],
+  F: ['#####', '#....', '#....', '####.', '#....', '#....', '#....'],
+  A: ['.###.', '#...#', '#...#', '#####', '#...#', '#...#', '#...#'],
+  T: ['#####', '..#..', '..#..', '..#..', '..#..', '..#..', '..#..'],
+  U: ['#...#', '#...#', '#...#', '#...#', '#...#', '#...#', '.###.'],
+  R: ['####.', '#...#', '#...#', '####.', '#.#..', '#..#.', '#...#'],
+  N: ['#...#', '##..#', '#.#.#', '#..##', '#...#', '#...#', '#...#'],
 }
 
-// Облако из блоков.
-const cloud = (x: number, y: number, cls: string): string =>
-  `<g class="${cls}">` +
-  rect(x + 8, y, 16, 4, '#3a3488') +
-  rect(x + 4, y + 4, 28, 4, '#3a3488') +
-  rect(x, y + 8, 40, 4, '#2c2870') +
-  '</g>'
+const write = (text: string, centerX: number, top: number, color: string): string => {
+  const step = 7
+  const left = Math.round(centerX - (text.length * step - 2) / 2)
+  let out = ''
+
+  text.split('').forEach((letter, i) => {
+    const glyph = FONT[letter]
+
+    if (glyph === undefined) {
+      return
+    }
+    glyph.forEach((row, y) => {
+      row.split('').forEach((dot, x) => {
+        if (dot === '#') {
+          out += rect(left + i * step + x, top + y, 1, 1, color)
+        }
+      })
+    })
+  })
+
+  return out
+}
+
+const caption = write(CAPTION, CX + 1, 133, '#5c4420') + write(CAPTION, CX, 132, '#e0b060')
 
 const SCENE =
   `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${W} ${H}" preserveAspectRatio="xMidYMid slice" shape-rendering="crispEdges">` +
   '<style>' +
-  '@keyframes tw{0%,100%{opacity:1}50%{opacity:.15}}' +
-  '.t0{animation:tw 2.4s steps(2) infinite}' +
-  '.t1{animation:tw 3.7s steps(2) 1s infinite}' +
-  '.t2{animation:tw 5.3s steps(2) 2s infinite}' +
-  '@keyframes drift{from{transform:translateX(-80px)}to{transform:translateX(360px)}}' +
-  '.c0{animation:drift 140s steps(220) infinite}' +
-  '.c1{animation:drift 200s steps(220) -90s infinite}' +
-  '@media (prefers-reduced-motion:reduce){.t0,.t1,.t2,.c0,.c1{animation:none}}' +
+  '@keyframes tw{0%,100%{opacity:1}50%{opacity:.2}}' +
+  '.t0{animation:tw 2.8s steps(2) infinite}' +
+  '.t1{animation:tw 4.1s steps(2) 1s infinite}' +
+  '.t2{animation:tw 5.9s steps(2) 2s infinite}' +
+  '@keyframes bob{0%,100%{transform:translateY(0)}50%{transform:translateY(2px)}}' +
+  '.sat{animation:bob 16s steps(4) infinite}' +
+  '@media (prefers-reduced-motion:reduce){.t0,.t1,.t2,.sat{animation:none}}' +
   '</style>' +
-  '<defs><pattern id="scan" width="2" height="2" patternUnits="userSpaceOnUse">' +
-  rect(0, 1, 2, 1, '#000000') +
-  '</pattern></defs>' +
-  sky +
+  space +
   stars +
-  moon +
-  cloud(0, 52, 'c0') +
-  cloud(0, 84, 'c1') +
-  mountains +
-  ground +
-  `<rect width="${W}" height="${H}" fill="url(#scan)" opacity=".14"/>` +
+  moons +
+  `<g class="sat">${saturn}</g>` +
+  caption +
   '</svg>'
 
 const LOOK: ThemeSetArgs = {
   colors: theme,
   backdrop: {
-    scene: 'pixel-dusk',
+    scene: 'saturn',
     // Лёгкая вуаль под панелями, чтобы текст читался, а пиксели не размывались.
-    glass: { blur: 2, tint: '#0e0b26', opacity: 0.72 },
+    glass: { blur: 2, tint: '#0e0b26', opacity: 0.7 },
   },
 }
 
@@ -174,6 +243,6 @@ export const register: Register = on => {
 
     const { Svg } = $.ui.resolve(e)
 
-    return <Svg source={SCENE} alt="Пиксельный закат: звёзды, луна и горы в стиле 8-битных игр" isInteractive />
+    return <Svg source={SCENE} alt="Пиксельный Сатурн с кольцами среди звёзд" isInteractive />
   })
 }
